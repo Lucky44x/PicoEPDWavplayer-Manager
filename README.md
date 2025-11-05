@@ -1,6 +1,6 @@
 # PICO-EPD-WAV-PLAYER
 
-**This Project does nothing standalone and requires [My PICO-EPD-WAV Player]([https://github.com/elehobica/RPi_Pico_WAV_Player](https://github.com/Lucky44x/PicoEPDAudioPlayer)) to actually read the data that this project produces**  
+**This Project does nothing standalone and requires [My PICO-EPD-WAV Player](https://github.com/Lucky44x/PicoEPDAudioPlayer) to actually read the data that this project produces**  
 
 ### Explanation
 This Project is aimed to manage, build and flash my custom Media-Library format, onto a micro-SD-Card which can then be used with my PICO-EPD-WAV Player to actually play the music stored on the micro-sd-card   
