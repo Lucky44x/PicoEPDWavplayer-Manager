@@ -123,6 +123,7 @@
     <Compile Include="DatabaseFlasher.Designer.cs">
       <DependentUpon>DatabaseFlasher.cs</DependentUpon>
     </Compile>
+    <Compile Include="ImageDBReader.cs" />
     <Compile Include="ImageGrayscaleConverter.cs" />
     <Compile Include="mp3_Album.cs" />
     <Compile Include="mp3_Artist.cs" />

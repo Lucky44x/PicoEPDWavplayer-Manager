@@ -36,9 +36,11 @@ namespace MP3Manager
         }
 
         public void removeSong(int idx) { songs.RemoveAt(idx); }
+        public void removeSong(mp3_Song inst) { songs.Remove(inst); }
 
         public void setName(string name) 
         { 
+            if (name == null) name = "Unknown Album";
             this.name = name;
             if (this.name.Length > 22)
             {

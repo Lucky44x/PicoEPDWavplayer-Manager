@@ -44,6 +44,17 @@ namespace MP3Manager
             }
         }
 
+        public mp3_Song(string songName, byte[] byteHash, string sourceFile)
+        {
+            setName(songName);
+            this.byteHash = byteHash;
+            this.hash = BitConverter.ToString(byteHash);
+            this.length = "N/A - Generated";
+            this.fileType = "N/A - Generated";
+            this.SourceFile = sourceFile;
+            this.hash = BitConverter.ToString(byteHash);
+        }
+
         public string getName() { return this.SongName; }
         public string getTruncatedName() {  return this.TruncatedSongName; }
 

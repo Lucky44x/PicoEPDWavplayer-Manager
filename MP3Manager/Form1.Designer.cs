@@ -427,6 +427,7 @@
             this.removeSongButton.TabIndex = 0;
             this.removeSongButton.Text = "Remove Song";
             this.removeSongButton.UseVisualStyleBackColor = true;
+            this.removeSongButton.Click += new System.EventHandler(this.removeSongButton_Click);
             // 
             // songBox
             // 
@@ -689,6 +690,7 @@
             this.removeAlbumButton.TabIndex = 0;
             this.removeAlbumButton.Text = "Remove Album";
             this.removeAlbumButton.UseVisualStyleBackColor = true;
+            this.removeAlbumButton.Click += new System.EventHandler(this.removeAlbumButton_Click);
             // 
             // albumBox
             // 
@@ -836,6 +838,7 @@
             this.removeArtistButton.TabIndex = 0;
             this.removeArtistButton.Text = "Remove Artist";
             this.removeArtistButton.UseVisualStyleBackColor = true;
+            this.removeArtistButton.Click += new System.EventHandler(this.removeArtistButton_Click);
             // 
             // artistBox
             // 

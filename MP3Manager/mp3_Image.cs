@@ -39,6 +39,16 @@ namespace MP3Manager
             generateGrayscale();
         }
 
+        public mp3_Image(byte[] source)
+        {
+            // First set source Image
+            sourceImage = ImageDBReader.Decode2BppToBitmap(source);
+            generateHash();
+            setName(sourceHash);
+            generated = true;
+            generateGrayscale();
+        }
+
         private void generateHash()
         {
             using (var md5 = MD5.Create())

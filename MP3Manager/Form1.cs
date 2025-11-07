@@ -50,6 +50,14 @@ namespace MP3Manager
 
         #region Song
 
+        private void internal_add_song_silent(mp3_Song song)
+        {
+            songList.Add(song);
+
+            songBox.Items.Add(song.getName());
+            songBox.SelectedIndex = songBox.Items.Count - 1;
+        }
+
         private void internal_add_song(mp3_Song song)
         {
             TagLib.File file = TagLib.File.Create(song.getFilePath());
@@ -63,6 +71,7 @@ namespace MP3Manager
 
             songList.Add(song);
             
+            //TODO: Do not generate album if song is only song in album (Single)
             int albumIdx = internal_find_album(file.Tag.Album, file);
             if (albumIdx > -1) albumList[albumIdx].insertSong(-1, song);
 
@@ -110,6 +119,18 @@ namespace MP3Manager
             }
         }
 
+        private void internal_remove_song(int idx)
+        {
+            mp3_Song selectedSong = songList[idx];
+            foreach (mp3_Album album in albumList)
+            {
+                album.removeSong(selectedSong);
+            }
+            songList.Remove(selectedSong);
+            songBox.SelectedIndex = -1;
+            internal_refresh_song_box();
+        }
+
         private void addSongButton_Click(object sender, EventArgs e)
         {
             using (OpenFileDialog ofd = new OpenFileDialog())
@@ -131,6 +152,11 @@ namespace MP3Manager
             }
         }
 
+        private void removeSongButton_Click(object sender, EventArgs e)
+        {
+            internal_remove_song(songBox.SelectedIndex);
+        }
+
         private void addSongWebButton_Click(object sender, EventArgs e)
         {
             string url = "";
@@ -142,6 +168,7 @@ namespace MP3Manager
 
         private void songBox_SelectedIndexChanged(object sender, EventArgs e)
         {
+            if (songBox.SelectedIndex < 0) return;
             mp3_Song selectedSong = songList[songBox.SelectedIndex];
             if (selectedSong == null) if (MessageBox.Show("Error While Reading Song Info - Indexed at " + songBox.SelectedIndex + " - only " + songList.Count + " - Len available") == DialogResult.OK) return;
 
@@ -251,6 +278,11 @@ namespace MP3Manager
             internal_add_artist(new mp3_Artist(name));
             foundIndex = artistList.Count - 1;
             return foundIndex;
+        }
+
+        private void removeArtistButton_Click(object sender, EventArgs e)
+        {
+
         }
 
         private void artistBox_SelectedIndexChanged(object sender, EventArgs e)
@@ -484,6 +516,7 @@ namespace MP3Manager
         {
             foreach (mp3_Album album in albumList)
             {
+                if (albumName == null) break;
                 if (albumName.ToLower().Equals(album.getName().ToLower())) return albumList.IndexOf(album);
             }
 
@@ -500,6 +533,12 @@ namespace MP3Manager
 
             internal_add_album(newAlbum, backgroundWorker1.IsBusy);
             return albumList.Count - 1;
+        }
+        private void removeAlbumButton_Click(object sender, EventArgs e)
+        {
+            if (albumBox.SelectedIndex < 0 || albumBox.SelectedIndex > albumList.Count) return;
+            albumList.RemoveAt(albumBox.SelectedIndex);
+            internal_refresh_album_box();
         }
 
         private void albumBox_SelectedIndexChanged(object sender, EventArgs e)
@@ -682,6 +721,7 @@ namespace MP3Manager
                 return;
             }
 
+            if (overviewDriveBox.SelectedItem == null) return;
             string driveLetter = overviewDriveBox.SelectedItem as string;
             driveLetter = driveLetter.Substring(0, 1);
 
@@ -712,7 +752,7 @@ namespace MP3Manager
 
             // Clear unused songs
             string[] files = Directory.GetFiles(driveLetter + ":\\");
-            foreach (String file in files)
+            foreach (string file in files)
             {
                 if (file.EndsWith(".db"))
                 {
@@ -720,9 +760,14 @@ namespace MP3Manager
                     continue;
                 }
 
-                string fileName = file.Substring(0, file.Length - 4);
-                if (songHashes.Contains(fileName.ToUpper())) continue;  // Keep files with the same hash-id
-                System.IO.File.Delete(fileName);                        // Delete all those that arent used
+                string fileName = file.Substring(3, 32);
+                if (songHashes.Contains(fileName.ToUpper()))
+                {
+                    System.Console.WriteLine("Spared reused file: " + fileName);
+                    continue;  // Keep files with the same hash-id
+                }
+                System.IO.File.Delete(file);                        // Delete all those that arent used
+                System.Console.WriteLine("Deleted unused file: " + fileName);
             }
 
             buildDatabases(driveLetter + ":\\");
@@ -747,13 +792,14 @@ namespace MP3Manager
         {
             using (var fbd = new FolderBrowserDialog())
             {
-                fbd.Description = "Select directory to build databases adn files into";
+                fbd.Description = "Select directory to load databases from";
                 fbd.ShowNewFolderButton = true;
 
                 if (fbd.ShowDialog() == DialogResult.OK)
                 {
                     string selectedPath = fbd.SelectedPath;
                     MessageBox.Show("Load databases located in: " + selectedPath);
+                    loadDatabases(selectedPath);
                 }
             }
         }
@@ -791,7 +837,6 @@ namespace MP3Manager
             totalFileCount = 0;
             totalFileCount += songList.Count;
             totalFileCount += imageList.Count;
-            //TODO: Replace this with a proper search since artist could very well alreay have their artist-album
             totalFileCount += albumList.Count + artistList.Count;
             totalFileCount += artistList.Count;
 
@@ -932,7 +977,7 @@ namespace MP3Manager
                     string fname = MD5ToLowerHexNoSep(song.getByteHash()) + ".wav";
                     //System.IO.File.Copy(song.getFilePath(),Path.Combine(path, fname), overwrite: false);
 
-                    if (!System.IO.File.Exists(Path.Combine(path, fname)))
+                    if (!song.getFilePath().StartsWith(path) && !System.IO.File.Exists(Path.Combine(path, fname)))
                     {
                         //Convert to wav if not already
                         string originalSongPath = song.getFilePath();
@@ -972,6 +1017,134 @@ namespace MP3Manager
 
                     currentFileCount++;
                     backgroundWorker1.ReportProgress((int)((currentFileCount/totalFileCount) * 100));
+                }
+            }
+        }
+
+        #endregion
+
+        #region Loading
+       
+        private void loadDatabases(string path)
+        {
+            // Load Images first
+            loadImages(Path.Combine(path, "images.db"));
+
+            // Load Artists
+            loadArtists(Path.Combine(path, "artists.db"));
+
+            // Load Songs
+            loadSongs(path, Path.Combine(path, "songs.db"));
+
+            // Load Albums (except last n albums where n = length of artists-list -> excludes auto-generated artist-albums)
+            loadAlbums(Path.Combine(path, "albums.db"));
+        }
+
+        private void loadImages(string path)
+        {
+            using (ImageDBReader db = new ImageDBReader(path))
+            {
+                Console.WriteLine("Loading " + db.ImageCount + " images from images.db");
+                
+                for(int i = 0; i < db.ImageCount; i++)
+                {
+                    byte[] raw = db.ReadRawImageBytes(i);
+                    internal_add_image(new mp3_Image(raw));
+                }
+            }
+
+        }
+
+        private void loadArtists(string path)
+        {
+            using (BinaryReader br = new BinaryReader(System.IO.File.OpenRead(path)))
+            {
+                int artistCount = (int)(br.BaseStream.Length / 50);
+                System.Console.WriteLine("Loading " + artistCount + " artists from artists.db");
+
+                for (int i = 0; i < artistCount; i++)
+                {
+                    byte[] nameBytes = br.ReadBytes(22 * 2);
+                    string artistName = Convert2Byte_UTF8(nameBytes).TrimEnd('\0');
+                    uint imageID = br.ReadU24LE();
+                    uint albumID = br.ReadU24LE(); // Could discad but retain for correct offset in reader
+                    mp3_Image artistImage = null;
+                    if (imageList.Count > imageID)
+                        artistImage = imageList[(int)imageID];
+
+                    mp3_Artist artist = new mp3_Artist(artistName);
+                    artist.setImage(artistImage);
+                    internal_add_artist(artist);
+                }
+            }
+        }
+
+        private void loadSongs(string path, string databasePath)
+        {
+            using (BinaryReader br = new BinaryReader(System.IO.File.OpenRead(databasePath)))
+            {
+                int songCount = (int)(br.BaseStream.Length / 66);
+                System.Console.WriteLine("Loading " + songCount + " songs from songs.db");
+                for (int i = 0; i < songCount; i++)
+                {
+                    byte[] hashBytes = br.ReadBytes(16);
+                    byte[] nameBytes = br.ReadBytes(22 * 2);
+                    string songName = Convert2Byte_UTF8(nameBytes).TrimEnd('\0');
+                    uint artistID = br.ReadU24LE();
+                    uint imageID = br.ReadU24LE();
+
+                    string songFilePath = Path.Combine(path, MD5ToLowerHexNoSep(hashBytes) + ".wav");
+
+                    mp3_Artist songArtist = null;
+                    if (artistList.Count > artistID)
+                        songArtist = artistList[(int)artistID];
+                    mp3_Image songImage = null;
+                    if (imageList.Count > imageID)
+                        songImage = imageList[(int)imageID];
+
+                    mp3_Song song = new mp3_Song(songName, hashBytes, songFilePath);
+                    song.setArtist(songArtist);
+                    song.setImage(songImage);
+                    internal_add_song_silent(song);
+                }
+            }
+        }
+
+        private void loadAlbums(string path)
+        {
+            using (BinaryReader br = new BinaryReader(System.IO.File.OpenRead(path)))
+            {
+                int albumCount = (int)br.ReadU24LE();
+                Console.WriteLine("Loading " + albumCount + " albums from albums.db");
+
+                for (int i = 0; i < albumCount; i++)
+                {
+                    if (albumCount - i <= artistList.Count) break; //Skip auto-generated artist albums
+
+                    byte[] nameBytes = br.ReadBytes(22 * 2);
+                    string albumName = Convert2Byte_UTF8(nameBytes).TrimEnd('\0');
+                    uint imageID = br.ReadU24LE();
+                    uint songCount = br.ReadU24LE();
+                    uint songListOffset = br.ReadU24LE();
+                    mp3_Image albumImage = null;
+                    if (imageList.Count > imageID)
+                        albumImage = imageList[(int)imageID];
+                    mp3_Album album = new mp3_Album(albumName);
+                    album.setCover(albumImage);
+                    long currentPos = br.BaseStream.Position;
+                    br.BaseStream.Position = songListOffset;
+                    for (int s = 0; s < songCount; s++)
+                    {
+                        uint songID = br.ReadU24LE();
+                        if (songList.Count > songID)
+                        {
+                            mp3_Song song = songList[(int)songID];
+                            album.insertSong(-1, song);
+                        }
+                    }
+
+                    br.BaseStream.Position = currentPos;
+                    internal_add_album(album);
                 }
             }
         }
@@ -1027,6 +1200,30 @@ namespace MP3Manager
             return result;
         }
 
+        private string Convert2Byte_UTF8(byte[] raw)
+        {
+            if (raw == null || raw.Length == 0)
+                return string.Empty;
+
+            // Ensure even length (each code unit = 2 bytes)
+            if ((raw.Length & 1) != 0)
+                throw new ArgumentException("Input length must be even.", nameof(raw));
+
+            int charCount = raw.Length / 2;
+            var chars = new char[charCount];
+
+            int outIndex = 0;
+            for (int i = 0; i < raw.Length; i += 2)
+            {
+                int lo = raw[i];
+                int hi = raw[i + 1];
+                ushort code = (ushort)((hi << 8) | lo);  // reconstruct little-endian 16-bit value
+                chars[outIndex++] = (char)code;
+            }
+
+            return new string(chars);
+        }
+
         public static DialogResult InputBox(string title, string promptText, ref string value)
         {
             Form form = new Form();
@@ -1079,6 +1276,14 @@ namespace MP3Manager
             bw.Write((byte)(value & 0xFF));
             bw.Write((byte)((value >> 8) & 0xFF));
             bw.Write((byte)((value >> 16) & 0xFF));
+        }
+
+        public static uint ReadU24LE(this BinaryReader br)
+        {
+            byte b0 = br.ReadByte();
+            byte b1 = br.ReadByte();
+            byte b2 = br.ReadByte();
+            return (uint)(b0 | (b1 << 8) | (b2 << 16));
         }
 
         public static void WriteU24BE(this BinaryWriter bw, uint value)
